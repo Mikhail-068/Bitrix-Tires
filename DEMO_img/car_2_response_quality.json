@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "mode": "quality",
+  "error": null,
+  "quality": {
+    "classification": "Плохая",
+    "suffix": "_ПЛОХАЯ",
+    "score": 12.357330322265625,
+    "confidence": 1.0,
+    "threshold": 8.0
+  },
+  "season_spikes": null,
+  "detection": {
+    "count": 1,
+    "multiple_tires_detected": 1,
+    "selected_bbox": [
+      1083.8192138671875,
+      13.880680084228516,
+      2910.777587890625,
+      3399.28076171875
+    ],
+    "selected_confidence": 0.83610600233078,
+    "selected_bbox_original": [
+      1083.0,
+      13.0,
+      2910.0,
+      3399.0
+    ]
+  }
+}

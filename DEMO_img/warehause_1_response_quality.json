@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "mode": "quality",
+  "error": null,
+  "quality": {
+    "classification": "Уточнить",
+    "suffix": "_УТОЧНИТЬ",
+    "score": 0.08267972618341446,
+    "confidence": 0.0,
+    "threshold": 8.0
+  },
+  "season_spikes": null,
+  "detection": {
+    "count": 1,
+    "multiple_tires_detected": 1,
+    "selected_bbox": [
+      79.58721923828125,
+      161.73361206054688,
+      2924.107666015625,
+      2914.07177734375
+    ],
+    "selected_confidence": 0.9897075891494751,
+    "selected_bbox_original": [
+      79.0,
+      161.0,
+      2924.0,
+      2914.0
+    ]
+  }
+}

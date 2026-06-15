@@ -1,0 +1,14 @@
+{
+  "success": false,
+  "mode": "quality",
+  "error": "no_detection",
+  "quality": null,
+  "season_spikes": null,
+  "detection": {
+    "count": 0,
+    "multiple_tires_detected": 0,
+    "selected_bbox": null,
+    "selected_confidence": null,
+    "selected_bbox_original": null
+  }
+}
