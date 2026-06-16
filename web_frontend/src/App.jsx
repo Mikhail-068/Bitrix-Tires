@@ -899,7 +899,7 @@ function Finished({ payload, context }) {
       <h2 className="step-title mt-12">{success ? "Данные успешно отправлены!" : "Сессия завершена"}</h2>
       {payload.message && <p className="step-hint mt-8">{payload.message}</p>}
       <SendResultPanel result={payload.send_result} />
-      <button className="btn-primary btn-full mt-20" type="button" onClick={() => context.showToast("Нажмите «+ Новая сессия» в верхней панели", "info")}>Начать новую сессию</button>
+      <button className="btn-primary btn-full mt-20" type="button" onClick={() => context.startFlow()}>Начать новую сессию</button>
     </div>
   );
 }
