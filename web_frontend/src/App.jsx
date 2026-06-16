@@ -821,6 +821,7 @@ function CommentStep({ context }) {
 
 function ConfirmSend({ payload, context }) {
   const summary = payload.summary || {};
+  const sendResult = payload.send_result || null;
   const photos = Array.isArray(summary.photos) ? summary.photos : [];
   const serials = photos.filter((photo) => Number(photo.photo_number) === 4 && photo.result?.number).map((photo) => `Шина ${photo.tire_number}: ${photo.result.number}`);
   const rows = [
@@ -844,6 +845,7 @@ function ConfirmSend({ payload, context }) {
         <button className="btn-primary btn-large" type="button" onClick={() => context.sendAction("confirm_send")}>📤 Отправить в 1С</button>
         <button className="btn-ghost" type="button" onClick={() => context.sendAction("cancel_send")}>✗ Отменить</button>
       </div>
+      <SendResultPanel result={sendResult} />
     </div>
   );
 }
@@ -855,8 +857,50 @@ function Finished({ payload, context }) {
       <div className={`finish-icon${success ? " success" : ""}`}>{success ? "✓" : "✗"}</div>
       <h2 className="step-title mt-12">{success ? "Данные успешно отправлены!" : "Сессия завершена"}</h2>
       {payload.message && <p className="step-hint mt-8">{payload.message}</p>}
+      <SendResultPanel result={payload.send_result} />
       <button className="btn-primary btn-full mt-20" type="button" onClick={() => context.showToast("Нажмите «+ Новая сессия» в верхней панели", "info")}>Начать новую сессию</button>
     </div>
+  );
+}
+
+function SendResultPanel({ result }) {
+  if (!result || typeof result !== "object") return null;
+  const ok = result.ok === true || result.status === "success";
+  const rows = [
+    ["Время", result.timestamp],
+    ["Адрес", result.request_url],
+    ["ConnectionString", result.connection_string],
+    ["HTTP", result.response_status],
+    ["Тип ошибки", result.error_type],
+    ["Длительность", result.elapsed_time_seconds != null ? `${result.elapsed_time_seconds} сек.` : ""],
+    ["Лог", result.log_file],
+  ].filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "");
+  return (
+    <section className={`send-result-panel ${ok ? "send-result-success" : "send-result-error"}`} role="status" aria-live="polite">
+      <div className="send-result-head">
+        <span className="send-result-mark">{ok ? "✓" : "!"}</span>
+        <div>
+          <strong>{ok ? "1С приняла данные" : "1С не приняла данные"}</strong>
+          <p>{result.message || (ok ? "Отправка завершена успешно" : "Отправка завершилась ошибкой")}</p>
+        </div>
+      </div>
+      {rows.length > 0 && (
+        <div className="send-result-grid">
+          {rows.map(([key, value]) => (
+            <React.Fragment key={key}>
+              <span>{key}</span>
+              <strong>{String(value)}</strong>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+      {result.response_text && (
+        <details className="send-result-detail">
+          <summary>Ответ сервера</summary>
+          <pre>{String(result.response_text)}</pre>
+        </details>
+      )}
+    </section>
   );
 }
 

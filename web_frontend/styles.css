@@ -1386,6 +1386,85 @@ body.lightbox-open {
   animation: successPop 0.42s ease-out;
 }
 
+.send-result-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card2);
+  text-align: left;
+}
+.send-result-success {
+  border-color: color-mix(in oklab, var(--accent2) 62%, var(--line));
+  background: color-mix(in oklab, var(--accent2) 10%, var(--card2));
+}
+.send-result-error {
+  border-color: color-mix(in oklab, var(--danger) 62%, var(--line));
+  background: color-mix(in oklab, var(--danger) 10%, var(--card2));
+}
+.send-result-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.send-result-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-weight: 900;
+  color: #fff;
+  background: var(--danger);
+}
+.send-result-success .send-result-mark {
+  background: var(--accent2);
+}
+.send-result-head strong {
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+.send-result-head p {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.send-result-grid {
+  display: grid;
+  grid-template-columns: minmax(86px, 0.35fr) minmax(0, 1fr);
+  gap: 7px 12px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in oklab, var(--line) 76%, transparent);
+  font-size: 0.78rem;
+}
+.send-result-grid span {
+  color: var(--muted);
+}
+.send-result-grid strong {
+  min-width: 0;
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.send-result-detail summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.78rem;
+  user-select: none;
+}
+.send-result-detail pre {
+  margin-top: 8px;
+  max-height: 180px;
+  white-space: pre-wrap;
+}
+
 /* ─── Welcome screen ────────────────────────────────────────────────────────── */
 
 .welcome-icon { font-size: 3.2rem; }

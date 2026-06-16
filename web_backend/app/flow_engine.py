@@ -1,5 +1,16 @@
 from __future__ import annotations
 
+import sys
+# Force UTF-8 for S3 key handling on Windows (cp1251 console causes mojibake in filenames).
+if sys.platform == "win32":
+    for attr in ("stdin", "stdout", "stderr"):
+        stream = getattr(sys, attr)
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8")
+            except Exception:
+                pass
+
 import asyncio
 import base64
 import copy
@@ -35,6 +46,7 @@ ATWORK_INDEX_LEGACY_FILE = ".index_telegram.json"
 ATWORK_INDEX_VERSION = 1
 ATWORK_S3_MANIFEST_FILE = ".s3_manifest.json"
 ATWORK_S3_MANIFEST_VERSION = 1
+ATWORK_INTERNAL_FILES = {ATWORK_INDEX_FILE, ATWORK_INDEX_LEGACY_FILE, ATWORK_S3_MANIFEST_FILE}
 
 STEP_SELECT_BASE = "select_base"
 STEP_SELECT_USER = "select_user"
@@ -70,6 +82,18 @@ def _to_abs(path_value: str) -> Path:
     if path.is_absolute():
         return path
     return (Path(settings.project_root).resolve() / path).resolve()
+
+
+def _normalize_exchange_ai_url(base_url: str) -> str:
+    base = str(base_url or "").strip()
+    if not base:
+        return ""
+    if "://" not in base:
+        base = f"http://{base}"
+    base = base.rstrip("/")
+    if re.search(r"/hs/Exchange_AI/[^/]+$", base, flags=re.IGNORECASE):
+        return base
+    return f"{base}/TireDefect"
 
 
 def _safe_load_json(path: Path) -> Any:
@@ -533,12 +557,24 @@ class FlowEngine:
 
         current_files: dict[str, dict[str, int]] = {}
         for file in self.paths.atwork_root.glob("*.json"):
+            if file.name in ATWORK_INTERNAL_FILES:
+                continue
             current_files[file.name] = self._index_file_meta(file)
 
         indexed_files = {
             k: v for k, v in index_data.get("files", {}).items()
-            if isinstance(k, str) and isinstance(v, dict)
+            if isinstance(k, str) and k not in ATWORK_INTERNAL_FILES and isinstance(v, dict)
         }
+
+        # A previous failed/partial build can leave file metadata present while
+        # lookup maps are empty. In that state no file looks "changed", so force
+        # a clean rebuild instead of returning an unusable index.
+        if current_files and indexed_files and (
+            not index_data.get("by_file_entries") or not index_data.get("by_bitrix")
+        ):
+            index_data = self._empty_atwork_index()
+            indexed_files = {}
+
         deleted = set(indexed_files.keys()) - set(current_files.keys())
         changed_or_new = [
             file_name
@@ -650,6 +686,8 @@ class FlowEngine:
     def _iter_atwork_rows(self) -> list[tuple[dict[str, Any], Path]]:
         rows: list[tuple[dict[str, Any], Path]] = []
         for file in self.paths.atwork_root.glob("*.json"):
+            if file.name in ATWORK_INTERNAL_FILES:
+                continue
             try:
                 payload = _safe_load_json(file)
             except Exception:
@@ -761,11 +799,17 @@ class FlowEngine:
             self._set_select_user_step(state, ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE)
             return False
 
-        await self._sync_user_from_s3(tid)
+        sync_result = await self._sync_user_from_s3(tid, surname_value)
         bases = self._find_user_bases_by_bitrix_id(tid)
         if not bases or not self._surname_matches_user_bases(bases, surname_value):
             self._clear_auth_state(state)
-            self._set_select_user_step(state, ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE)
+            extra = {"bitrix_id": tid, "s3_sync": sync_result}
+            message = ACCESS_DENIED_MESSAGE
+            if sync_result.get("error"):
+                message = f"{ACCESS_DENIED_MESSAGE}. S3: {sync_result['error']}"
+            elif not sync_result.get("downloaded") and not bases:
+                message = f"{ACCESS_DENIED_MESSAGE}. Профили для пользователя не загружены из S3"
+            self._set_select_user_step(state, ACCESS_DENIED_CODE, message, extra)
             return False
 
         self._mark_auth_verified(state, tid, surname_value)
@@ -819,25 +863,27 @@ class FlowEngine:
             return copy.deepcopy(row), file
         return None
 
-    def _sync_user_from_s3_blocking(self, bitrix_id: str) -> list[str]:
+    def _sync_user_from_s3_blocking(self, bitrix_id: str, surname: str = "") -> dict[str, Any]:
         downloaded: list[str] = []
         bid = str(bitrix_id or "").strip()
         if not bid:
-            return downloaded
+            return {"downloaded": downloaded, "error": "empty_bitrix_id"}
         if not (settings.aws_access_key_id or "").strip() or not (settings.aws_secret_access_key or "").strip():
             logger.warning("S3 credentials are empty, skip user sync for BitrixID=%s", bid)
-            return downloaded
+            return {"downloaded": downloaded, "error": "empty_s3_credentials"}
 
         try:
             import boto3
             import botocore
         except Exception:
             logger.warning("boto3 is not installed, S3 user sync skipped")
-            return downloaded
+            return {"downloaded": downloaded, "error": "boto3_not_installed"}
 
         prefix = (settings.s3_prefix or "").strip()
         if prefix and not prefix.endswith("/"):
             prefix += "/"
+        surname_prefix = str(surname or "").strip()
+        list_prefix = f"{prefix}{surname_prefix}" if surname_prefix else prefix
 
         session = boto3.session.Session()
         s3 = session.client(
@@ -845,7 +891,12 @@ class FlowEngine:
             endpoint_url=settings.yc_endpoint_url,
             aws_access_key_id=settings.aws_access_key_id,
             aws_secret_access_key=settings.aws_secret_access_key,
-            config=botocore.client.Config(signature_version="s3v4"),
+            config=botocore.client.Config(
+                signature_version="s3v4",
+                connect_timeout=10,
+                read_timeout=20,
+                retries={"max_attempts": 2, "mode": "standard"},
+            ),
             region_name=settings.yc_region,
         )
         manifest = self._load_s3_manifest()
@@ -857,7 +908,7 @@ class FlowEngine:
         s3_json_objects: dict[str, dict[str, Any]] = {}
         s3_signatures: dict[str, dict[str, Any]] = {}
         paginator = s3.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=settings.s3_bucket_name, Prefix=prefix):
+        for page in paginator.paginate(Bucket=settings.s3_bucket_name, Prefix=list_prefix):
             for obj in page.get("Contents", []):
                 key = str(obj.get("Key") or "")
                 if not key.endswith(".json"):
@@ -865,7 +916,14 @@ class FlowEngine:
                 s3_json_objects[key] = obj
                 s3_signatures[key] = self._s3_obj_signature(obj)
 
-        deleted_keys = set(files_map.keys()) - set(s3_signatures.keys())
+        if surname_prefix and not s3_json_objects:
+            return {
+                "downloaded": downloaded,
+                "error": f"s3_no_json_for_prefix:{list_prefix}",
+                "matched_files": [],
+            }
+
+        deleted_keys = {key for key in files_map.keys() if str(key).startswith(list_prefix)} - set(s3_signatures.keys())
         changed_or_new_keys: set[str] = set()
         for key, sig in s3_signatures.items():
             prev_meta = files_map.get(key)
@@ -952,20 +1010,25 @@ class FlowEngine:
             self._refresh_atwork_index()
         except Exception:
             logger.exception("Failed to refresh AtWork index after S3 sync")
-        return downloaded
+        return {
+            "downloaded": downloaded,
+            "error": "",
+            "matched_files": sorted(matched_local_names),
+            "list_prefix": list_prefix,
+        }
 
-    async def _sync_user_from_s3(self, bitrix_id: str) -> list[str]:
+    async def _sync_user_from_s3(self, bitrix_id: str, surname: str = "") -> dict[str, Any]:
         try:
             return await asyncio.wait_for(
-                _run_in_thread(self._sync_user_from_s3_blocking, bitrix_id),
-                timeout=60.0,
+                _run_in_thread(self._sync_user_from_s3_blocking, bitrix_id, surname),
+                timeout=45.0,
             )
         except asyncio.TimeoutError:
             logger.warning("Per-user S3 sync timed out for BitrixID=%s", bitrix_id)
-            return []
-        except Exception:
+            return {"downloaded": [], "error": "s3_sync_timeout"}
+        except Exception as exc:
             logger.exception("Per-user S3 sync failed for BitrixID=%s", bitrix_id)
-            return []
+            return {"downloaded": [], "error": f"{type(exc).__name__}: {exc}"}
 
     def _copy_profile_json_to_session(self, state: dict[str, Any], source_file: Path) -> Path | None:
         session_id = str(state.get("session_id") or "")
@@ -1710,22 +1773,26 @@ class FlowEngine:
                 )
 
             elif action == "confirm_send":
-                sent, message = await self._export_to_1c(state)
+                sent, message, send_result = await self._export_to_1c(state)
+                state["last_send_result"] = send_result
                 if sent:
                     state["sent"] = True
                     self._set_step(
                         state,
                         STEP_FINISHED,
                         allowed_actions=[],
-                        ui_payload={"status": "sent", "message": message},
+                        ui_payload={"status": "sent", "message": message, "send_result": send_result},
                     )
                 else:
-                    self._set_error(state, "send_failed", message)
+                    self._set_error(state, "send_failed", message, {"send_result": send_result})
                     self._set_step(
                         state,
                         STEP_CONFIRM_SEND,
                         allowed_actions=["confirm_send", "cancel_send"],
-                        ui_payload={"summary": self._build_flow_summary(state)},
+                        ui_payload={
+                            "summary": self._build_flow_summary(state),
+                            "send_result": send_result,
+                        },
                     )
 
             elif action == "cancel_send":
@@ -2121,7 +2188,41 @@ class FlowEngine:
         log_root.mkdir(parents=True, exist_ok=True)
         return log_root / f"send_log_{session_dir.name}.json"
 
-    async def _export_to_1c(self, state: dict[str, Any]) -> tuple[bool, str]:
+    def _send_result_payload(
+        self,
+        *,
+        ok: bool,
+        message: str,
+        log_file: Path,
+        request_url: str = "",
+        connection_string: str = "",
+        response_status: int | None = None,
+        response_text: str = "",
+        error_type: str = "",
+        elapsed_seconds: float | None = None,
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "ok": ok,
+            "status": "success" if ok else "error",
+            "message": message,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "log_file": str(log_file),
+        }
+        if request_url:
+            result["request_url"] = request_url
+        if connection_string:
+            result["connection_string"] = connection_string
+        if response_status is not None:
+            result["response_status"] = response_status
+        if response_text:
+            result["response_text"] = response_text[:1000]
+        if error_type:
+            result["error_type"] = error_type
+        if elapsed_seconds is not None:
+            result["elapsed_time_seconds"] = round(elapsed_seconds, 2)
+        return result
+
+    async def _export_to_1c(self, state: dict[str, Any]) -> tuple[bool, str, dict[str, Any]]:
         session_payload = self._compose_export_json(state)
         payload = self._merge_preset_and_session_json(state, session_payload)
         state["final_payload"] = payload
@@ -2150,13 +2251,17 @@ class FlowEngine:
                 "error_message": "Не заданы ADMIN_USERNAME/ADMIN_PASSWORD",
             })
             _safe_dump_json(log_file, log_entry)
-            return False, "Не заданы ADMIN_USERNAME/ADMIN_PASSWORD"
+            message = "Не заданы ADMIN_USERNAME/ADMIN_PASSWORD"
+            return False, message, self._send_result_payload(
+                ok=False,
+                message=message,
+                log_file=log_file,
+                error_type="missing_credentials",
+            )
 
         connection_string = str(payload.get("ConnectionString", "") or "")
-        if "TEST" in connection_string.upper():
-            url = (settings.base_test or "").strip() or (settings.base_url or "").strip()
-        else:
-            url = (settings.base_url or "").strip()
+        endpoint_base = (settings.base_test or "").strip() if ("TEST" in connection_string.upper() and (settings.base_test or "").strip()) else (settings.base_url or "").strip()
+        url = _normalize_exchange_ai_url(endpoint_base)
         if not url:
             log_entry.update({
                 "status": "error",
@@ -2164,7 +2269,14 @@ class FlowEngine:
                 "error_message": "Не задан BASE_URL/BASE_TEST",
             })
             _safe_dump_json(log_file, log_entry)
-            return False, "Не задан BASE_URL/BASE_TEST"
+            message = "Не задан BASE_URL/BASE_TEST"
+            return False, message, self._send_result_payload(
+                ok=False,
+                message=message,
+                log_file=log_file,
+                connection_string=connection_string,
+                error_type="missing_url",
+            )
 
         auth_raw = f"{username}:{password}".encode("utf-8")
         headers = {
@@ -2185,6 +2297,7 @@ class FlowEngine:
             response.raise_for_status()
             log_entry.update({
                 "request_url": url,
+                "connection_string": connection_string,
                 "response_status": int(response.status_code),
                 "response_text": response.text[:1000] if len(response.text) > 1000 else response.text,
                 "response_text_full_length": len(response.text),
@@ -2203,28 +2316,57 @@ class FlowEngine:
                 "timestemp" in body and isinstance(body.get("Result"), dict)
             )
             if not is_ok:
+                message = f"1C отклонил данные: {response.text[:500]}"
                 log_entry.update({
                     "status": "error",
                     "error_type": "server_rejected",
-                    "error_message": f"1C отклонил данные: {response.text[:500]}",
+                    "error_message": message,
                 })
                 _safe_dump_json(log_file, log_entry)
-                return False, f"1C отклонил данные: {response.text[:500]}"
+                return False, message, self._send_result_payload(
+                    ok=False,
+                    message=message,
+                    log_file=log_file,
+                    request_url=url,
+                    connection_string=connection_string,
+                    response_status=int(response.status_code),
+                    response_text=response.text,
+                    error_type="server_rejected",
+                    elapsed_seconds=elapsed,
+                )
             payload["sent"] = True
             _safe_dump_json(export_file, payload)
             log_entry["status"] = "success"
             _safe_dump_json(log_file, log_entry)
-            return True, "Данные успешно отправлены в 1С"
+            message = "Данные успешно отправлены в 1С"
+            return True, message, self._send_result_payload(
+                ok=True,
+                message=message,
+                log_file=log_file,
+                request_url=url,
+                connection_string=connection_string,
+                response_status=int(response.status_code),
+                response_text=response.text,
+                elapsed_seconds=elapsed,
+            )
         except Exception as exc:
             logger.exception("1C send failed")
+            message = str(exc)
             log_entry.update({
                 "status": "error",
                 "error_type": "request_exception",
-                "error_message": str(exc),
+                "error_message": message,
                 "traceback": traceback.format_exc(),
             })
             _safe_dump_json(log_file, log_entry)
-            return False, str(exc)
+            return False, message, self._send_result_payload(
+                ok=False,
+                message=message,
+                log_file=log_file,
+                request_url=url,
+                connection_string=connection_string,
+                error_type="request_exception",
+            )
 
     def resolve_session_file(self, session_id: str, file_name: str) -> Path:
         base = self._uploads_dir(session_id).resolve()
