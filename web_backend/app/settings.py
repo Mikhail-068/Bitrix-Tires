@@ -2,8 +2,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
 
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+PROJECT_ROOT_DEFAULT = Path(__file__).resolve().parents[2]
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+    model_config = SettingsConfigDict(
+        env_file=('.env', str(BACKEND_DIR / '.env')),
+        env_file_encoding='utf-8',
+        extra='ignore',
+    )
 
     backend_host: str = '0.0.0.0'
     backend_port: int = 18080
@@ -16,7 +24,7 @@ class Settings(BaseSettings):
     allowed_origins: str = 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080'
 
     # Shared project paths / integration
-    project_root: str = str(Path(__file__).resolve().parents[2])
+    project_root: str = str(PROJECT_ROOT_DEFAULT)
     users_dir: str = 'Users'
     atwork_dir: str = 'AtWork'
     car_number_file_path: str = 'dir_json/car_number.json'

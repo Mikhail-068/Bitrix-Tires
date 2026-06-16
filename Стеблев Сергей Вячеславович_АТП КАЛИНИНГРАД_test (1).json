@@ -1,0 +1,14 @@
+[
+{
+"UID": "c254cf92-b3ac-11ef-a11e-005056abd2b4",
+"TelegramID": "5652315164",
+"Name": "Стеблев Сергей Вячеславович",
+"EMail": "",
+"IDCompany": "5032b697-1a47-11e5-be74-00155dc6002b",
+"NameCompany": "Филиал ООО \"РесурсТранс\" в г. Калининград",
+"INN": "7714731464",
+"KPP": "390643001",
+"ConnectionString": "http://ws-pub1c:800/RT83_ATP_KLG_TESTII",
+"BaseName": "АТП КАЛИНИНГРАД"
+}
+]

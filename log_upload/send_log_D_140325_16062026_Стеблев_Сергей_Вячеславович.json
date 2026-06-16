@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-06-16 14:04:20",
+  "user_id": "5652315164",
+  "folder_path": "B:\\Tires_Bitrix\\Users\\D_140325_16062026_Стеблев_Сергей_Вячеславович",
+  "source_file": "B:\\Tires_Bitrix\\Users\\D_140325_16062026_Стеблев_Сергей_Вячеславович\\D_140325_16062026_Стеблев_Сергей_Вячеславович.json",
+  "status": "success",
+  "details": {},
+  "request_url": "https://1c.rg24.ru/ATPLite/hs/Exchange_AI/TireDefect",
+  "connection_string": "http://ws-pub1c:800/RT83_ATP_KLG_TESTII",
+  "response_status": 200,
+  "response_text": "{\n\"Успех\": true,\n\"timestemp\": \"2026-06-16T14:04:33\"\n}",
+  "response_text_full_length": 53,
+  "sent_data_size": 11074251,
+  "sent_data_size_mb": 10.56,
+  "images_count": 5,
+  "request_timestamp": "2026-06-16 14:04:33",
+  "elapsed_time_seconds": 12.98,
+  "elapsed_time_minutes": 0.22
+}

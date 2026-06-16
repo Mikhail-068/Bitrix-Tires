@@ -230,6 +230,21 @@ Content-Type: application/json
 - при успехе возвращает шаг `select_base`;
 - при ошибке возвращает шаг `select_user` и сообщение `В доступе отказано, проверьте введенные данные`.
 
+Backend использует локальный индекс `AtWork/.index_bitrix.json` для поиска профилей по ID.
+Если пользователь есть в `AtWork/`, но API возвращает `select_user` с `access_denied`, проверьте индекс и S3-зависимости:
+
+```powershell
+cd B:\Tires_Bitrix
+@'
+from web_backend.app.flow_engine import FlowEngine
+engine = FlowEngine()
+idx = engine._refresh_atwork_index()
+print(idx.get("by_bitrix", {}).get("5652315164"))
+'@ | python -
+```
+
+Если в логах есть `boto3 is not installed, S3 user sync skipped`, установите зависимости backend из `web_backend/requirements.txt`.
+
 Из-за per-user sync стартовый запрос может быть заметно дольше обычного.
 На стороне Bitrix нужно:
 - блокировать кнопку `Start` на время запроса;
@@ -968,6 +983,19 @@ GET /api/health
 Ответ: `{ "status": "ok" }`  
 Используйте для проверки доступности сервера перед стартом.
 
+### Проверка ML-контейнеров (важно!)
+
+Backend проксирует распознавание в ML-контейнеры. Если при загрузке фото шаг не меняется — проверьте доступность ML:
+
+```powershell
+# С машины, где запущен backend:
+curl.exe -s http://5.35.10.157:11436/health
+curl.exe -s http://5.35.10.157:11435/health
+curl.exe -s http://5.35.10.157:11437/health
+```
+
+Если контейнеры не отвечают — backend не сможет распознать номер или проанализировать шину, и вернёт тот же шаг загрузки.
+
 ### Получение demo-изображения (пример ракурса)
 
 ```
@@ -1000,7 +1028,6 @@ if (ui_payload.preview_file) {
   img.src = `${API}/flow/${SESSION_ID}/file/${ui_payload.preview_file}`;
 }
 ```
-
 
 
 

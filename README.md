@@ -62,6 +62,24 @@ Backend:
 2. сверяет фамилию с ФИО из базы;
 3. при ошибке возвращает шаг `select_user` и сообщение: `В доступе отказано, проверьте введенные данные`.
 
+Для быстрого поиска backend поддерживает локальный индекс `AtWork/.index_bitrix.json`.
+Индекс пересобирается автоматически при изменении JSON-файлов и не должен включать служебные файлы `.index_bitrix.json`, `.index_telegram.json`, `.s3_manifest.json`.
+Если пользователь есть в `AtWork/`, но web всё равно пишет «доступ отказан», сначала проверьте индекс:
+
+```powershell
+cd B:\Tires_Bitrix
+@'
+from web_backend.app.flow_engine import FlowEngine
+engine = FlowEngine()
+idx = engine._refresh_atwork_index()
+print(len(idx.get("files", {})), len(idx.get("by_bitrix", {})))
+print(idx.get("by_bitrix", {}).get("5652315164"))
+'@ | python -
+```
+
+S3-синхронизация требует установленных `boto3` и `botocore` из `web_backend/requirements.txt`.
+Без них backend продолжит работать по локальному `AtWork/`, но будет писать в лог `boto3 is not installed, S3 user sync skipped`.
+
 Старт API:
 
 ```json
@@ -73,6 +91,45 @@ POST /api/flow/start
 ```
 
 Для Bitrix можно использовать `BitrixID` вместо `TelegramID` и передать фамилию из профиля пользователя.
+
+## ⚠️ Типичная проблема: ML-контейнеры недоступны
+
+Если при загрузке фото в web-интерфейсе шаг не меняется (снова показывает «Перетащите фото») или номер авто не распознаётся — проверьте настройки backend.
+
+### Причина
+Backend (`web_backend`) проксирует фото в ML-контейнеры для распознавания. Если URL в `.env` неверен — backend молча падает и возвращает тот же шаг.
+
+### Правильная конфигурация `.env`
+
+| Сервис | Backend API | ML-контейнеры |
+|--------|-------------|---------------|
+| Хост | `111.88.112.76` | `5.35.10.157` |
+| Car number | `18080/api/car-number/recognize` | `11436/recognize` |
+| Tire number | `18080/api/tire-number/recognize` | `11435/recognize` |
+| Tire analysis | `18080/api/tire-analysis/analyze` | `11437/analyze` |
+
+```env
+# ✅ Правильно — ML-контейнеры на отдельном сервере
+CAR_NUMBER_API_URL=http://5.35.10.157:11436/recognize
+TIRE_NUMBER_API_URL=http://5.35.10.157:11435/recognize
+TIRE_ANALYSIS_API_URL=http://5.35.10.157:11437/analyze
+
+# ❌ Неправильно — IP backend ≠ IP ML-сервера
+# CAR_NUMBER_API_URL=http://111.88.112.76:11436/recognize
+```
+
+### Диагностика
+```bash
+# С машины backend:
+curl http://5.35.10.157:11436/health
+curl http://5.35.10.157:11435/health
+curl http://5.35.10.157:11437/health
+```
+
+### Исправление
+1. Отредактируйте `web_backend/.env`
+2. Перезапустите backend (`uvicorn` или `docker compose up -d --build`)
+3. Проверьте загрузку фото снова
 
 ## Данные проекта
 

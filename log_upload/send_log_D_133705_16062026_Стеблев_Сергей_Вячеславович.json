@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-06-16 14:02:03",
+  "user_id": "5652315164",
+  "folder_path": "B:\\Tires_Bitrix\\Users\\D_133705_16062026_Стеблев_Сергей_Вячеславович",
+  "source_file": "B:\\Tires_Bitrix\\Users\\D_133705_16062026_Стеблев_Сергей_Вячеславович\\D_133705_16062026_Стеблев_Сергей_Вячеславович.json",
+  "status": "error",
+  "details": {},
+  "request_url": "https://1c.rg24.ru/ATPLite/hs/Exchange_AI/CarsData",
+  "connection_string": "http://ws-pub1c:800/RT83_ATP_KLG_TESTII",
+  "response_status": 200,
+  "response_text": "{\n\"Error\": \"Сотруднику не доступен сервис получения данных авто\"\n}",
+  "response_text_full_length": 66,
+  "sent_data_size": 11179616,
+  "sent_data_size_mb": 10.66,
+  "images_count": 5,
+  "request_timestamp": "2026-06-16 14:02:31",
+  "elapsed_time_seconds": 28.75,
+  "elapsed_time_minutes": 0.48,
+  "error_type": "server_rejected",
+  "error_message": "1C отклонил данные: {\n\"Error\": \"Сотруднику не доступен сервис получения данных авто\"\n}"
+}

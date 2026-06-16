@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-06-16 17:02:54",
+  "user_id": "5120087401",
+  "folder_path": "B:\\Tires_Bitrix\\Users\\D_165157_16062026_Белоконский_Анатолий_Владимирович",
+  "source_file": "B:\\Tires_Bitrix\\Users\\D_165157_16062026_Белоконский_Анатолий_Владимирович\\D_165157_16062026_Белоконский_Анатолий_Владимирович.json",
+  "status": "success",
+  "details": {},
+  "request_url": "https://1c.rg24.ru/ATPLite/hs/Exchange_AI/TireDefect",
+  "connection_string": "http://ws-pub1c/RT_ATP_DVS_83",
+  "response_status": 200,
+  "response_text": "{\n\"Успех\": true,\n\"timestemp\": \"2026-06-16T17:03:07\"\n}",
+  "response_text_full_length": 53,
+  "sent_data_size": 13203357,
+  "sent_data_size_mb": 12.59,
+  "images_count": 5,
+  "request_timestamp": "2026-06-16 17:03:06",
+  "elapsed_time_seconds": 12.66,
+  "elapsed_time_minutes": 0.21
+}

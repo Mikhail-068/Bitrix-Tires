@@ -1386,6 +1386,127 @@ body.lightbox-open {
   animation: successPop 0.42s ease-out;
 }
 
+.finalize-panel {
+  overflow: hidden;
+  text-align: left;
+}
+.finalize-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: #d7e8ff;
+  background: #24415f;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.server-ritual {
+  position: relative;
+  display: grid;
+  grid-template-columns: 92px minmax(120px, 1fr) 92px;
+  align-items: center;
+  gap: 14px;
+  min-height: 116px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--accent) 18%, transparent), color-mix(in oklab, var(--accent2) 10%, transparent)),
+    var(--card2);
+}
+.server-node {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 78px;
+  border: 1px solid color-mix(in oklab, var(--accent) 25%, var(--line));
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in oklab, var(--card) 72%, rgba(20, 30, 46, 0.18));
+}
+.server-node span {
+  width: 34px;
+  height: 24px;
+  border: 2px solid #7eb7ff;
+  border-radius: 5px;
+  box-shadow: inset 0 -6px 0 rgba(126, 183, 255, 0.16);
+}
+.target-node span {
+  width: 34px;
+  height: 34px;
+  border-color: #35d28b;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 7px 0 rgba(53, 210, 139, 0.18),
+    inset 0 -7px 0 rgba(53, 210, 139, 0.12);
+}
+.server-node strong {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.server-stream {
+  position: relative;
+  height: 36px;
+  border-top: 2px solid rgba(126, 183, 255, 0.28);
+  border-bottom: 2px solid rgba(53, 210, 139, 0.22);
+}
+.server-stream::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, rgba(126, 183, 255, 0), #7eb7ff, #35d28b, rgba(53, 210, 139, 0));
+  animation: streamPulse 1.2s ease-in-out infinite;
+}
+.server-stream i {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #7eb7ff;
+  box-shadow: 0 0 16px rgba(126, 183, 255, 0.55);
+  transform: translateY(-50%);
+  animation: dataPacket 1.35s linear infinite;
+}
+.server-stream i:nth-child(2) {
+  animation-delay: 0.35s;
+}
+.server-stream i:nth-child(3) {
+  animation-delay: 0.7s;
+}
+.upload-checklist {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.upload-checklist span {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: color-mix(in oklab, var(--card2) 82%, rgba(36, 51, 71, 0.28));
+  font-size: 0.8rem;
+  font-weight: 800;
+  animation: checklistGlow 1.4s ease-in-out infinite;
+}
+.upload-checklist span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.upload-checklist span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
 .send-result-panel {
   display: grid;
   gap: 12px;
@@ -1790,6 +1911,54 @@ pre {
   }
 }
 
+@keyframes streamPulse {
+  0% {
+    opacity: 0.45;
+    transform: translateY(-50%) scaleX(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-50%) scaleX(1);
+  }
+  100% {
+    opacity: 0.45;
+    transform: translateY(-50%) scaleX(0.88);
+  }
+}
+
+@keyframes dataPacket {
+  0% {
+    left: 0;
+    opacity: 0;
+    background: #7eb7ff;
+  }
+  12% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+    background: #35d28b;
+  }
+  100% {
+    left: calc(100% - 12px);
+    opacity: 0;
+    background: #35d28b;
+  }
+}
+
+@keyframes checklistGlow {
+  0%,
+  100% {
+    color: var(--muted);
+    border-color: var(--line);
+  }
+  45% {
+    color: var(--text);
+    border-color: color-mix(in oklab, var(--accent2) 55%, var(--line));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent2) 12%, transparent);
+  }
+}
+
 @keyframes cropPulse {
   0%,
   100% {
@@ -1856,6 +2025,21 @@ pre {
     font-size: 1.5rem;
   }
   .choice-grid              { grid-template-columns: 1fr; }
+  .server-ritual {
+    grid-template-columns: 64px minmax(78px, 1fr) 64px;
+    gap: 8px;
+    padding: 12px;
+  }
+  .server-node {
+    min-height: 66px;
+  }
+  .server-node strong,
+  .upload-checklist span {
+    font-size: 0.72rem;
+  }
+  .upload-checklist {
+    grid-template-columns: 1fr;
+  }
   .btn-row button           { min-width: 0; }
   .wizard-card              { padding: 16px 14px; }
 }

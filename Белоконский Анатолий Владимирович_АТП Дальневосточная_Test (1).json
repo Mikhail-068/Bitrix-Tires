@@ -1,0 +1,14 @@
+[
+{
+"UID": "13ceda8b-8418-11ed-96cb-10604bac4f40",
+"TelegramID": "5120087401",
+"Name": "Белоконский Анатолий Владимирович",
+"EMail": "",
+"IDCompany": "e8df682d-7214-11ed-a388-10604b99d2ac",
+"NameCompany": "Филиал ООО \"РесурсТранс\" в г. Хабаровск",
+"INN": "7714731464",
+"KPP": "270043001",
+"ConnectionString": "http://ws-pub1c:800/RT83_ATP_DVS_TESTII",
+"BaseName": "АТП Дальневосточная"
+}
+]

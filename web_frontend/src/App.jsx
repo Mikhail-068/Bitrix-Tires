@@ -7,6 +7,7 @@ import warehouseIconUrl from "../warehouse.png";
 const STORAGE_KEY = "protires_session_id";
 const THEME_KEY = "protires_theme";
 const CAR_PHOTO_INSTRUCTION = "Загрузите автомобиль, чтобы полностью был в кадре. Не отходите слишком далеко, номер должен быть читаемым";
+const SEND_MIN_MS = 1400;
 
 const STEP_STAGES = {
   select_base: 0,
@@ -820,6 +821,7 @@ function CommentStep({ context }) {
 }
 
 function ConfirmSend({ payload, context }) {
+  const [sendState, setSendState] = useState("idle");
   const summary = payload.summary || {};
   const sendResult = payload.send_result || null;
   const photos = Array.isArray(summary.photos) ? summary.photos : [];
@@ -835,6 +837,45 @@ function ConfirmSend({ payload, context }) {
   if (serials.length) rows.push(["Серийные номера", serials.join(" · ")]);
   rows.push(["Фотографий", photos.length]);
 
+  const confirmWithFeedback = async () => {
+    setSendState("sending");
+    await Promise.all([
+      context.sendAction("confirm_send"),
+      new Promise((resolve) => window.setTimeout(resolve, SEND_MIN_MS)),
+    ]);
+    setSendState("idle");
+  };
+
+  if (sendState === "sending") {
+    return (
+      <div className="step-body finalize-panel finalize-sending" role="status" aria-live="polite">
+        <div className="finalize-badge">Отправка в 1С</div>
+        <div className="server-ritual" aria-hidden="true">
+          <div className="server-node client-node">
+            <span />
+            <strong>ProTires</strong>
+          </div>
+          <div className="server-stream">
+            <i />
+            <i />
+            <i />
+          </div>
+          <div className="server-node target-node">
+            <span />
+            <strong>1С</strong>
+          </div>
+        </div>
+        <div className="upload-checklist">
+          <span>Проверяем пакет</span>
+          <span>Передаем фото и карточку</span>
+          <span>Ждем подтверждение</span>
+        </div>
+        <h2 className="step-title">Отправляем данные в 1С</h2>
+        <p className="step-hint">Собираем итоговую заявку, синхронизируем вложения и фиксируем ответ сервера.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="step-body">
       <h2 className="step-title">Готово к отправке в 1С</h2>
@@ -842,7 +883,7 @@ function ConfirmSend({ payload, context }) {
       <InfoCard rows={rows} />
       <DonePhotos photos={photos} context={context} />
       <div className="btn-row mt-16">
-        <button className="btn-primary btn-large" type="button" onClick={() => context.sendAction("confirm_send")}>📤 Отправить в 1С</button>
+        <button className="btn-primary btn-large" type="button" onClick={confirmWithFeedback}>📤 Отправить в 1С</button>
         <button className="btn-ghost" type="button" onClick={() => context.sendAction("cancel_send")}>✗ Отменить</button>
       </div>
       <SendResultPanel result={sendResult} />
