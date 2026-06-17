@@ -25,6 +25,18 @@ cd "$BACKEND_DIR"
 docker compose up -d --build
 docker compose ps
 
+for attempt in $(seq 1 30); do
+  if curl -fsS http://127.0.0.1:18080/health >/dev/null; then
+    break
+  fi
+  if [ "$attempt" -eq 30 ]; then
+    echo "Backend health check failed after $attempt attempts" >&2
+    docker compose ps >&2
+    exit 1
+  fi
+  sleep 2
+done
+
 curl -fsS http://127.0.0.1:18080/health
 echo
 curl -fsS http://127.0.0.1:18080/api/health
