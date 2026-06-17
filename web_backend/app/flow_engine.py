@@ -730,9 +730,25 @@ class FlowEngine:
             allowed_actions=["select_user"],
             ui_payload={
                 "title": "Авторизация",
-                "instruction": "Введите ID",
+                "instruction": "Введите Bitrix ID (логин)",
             },
         )
+
+    @staticmethod
+    def _resolve_bitrix_index_key(index_data: dict[str, Any], bitrix_id: str) -> str:
+        bid = str(bitrix_id or "").strip()
+        if not bid:
+            return ""
+        by_bitrix = index_data.get("by_bitrix", {})
+        if not isinstance(by_bitrix, dict):
+            return ""
+        if bid in by_bitrix:
+            return bid
+        bid_cf = bid.casefold()
+        for key in by_bitrix:
+            if str(key or "").strip().casefold() == bid_cf:
+                return str(key).strip()
+        return bid
 
     def _find_user_bases_by_bitrix_id(self, bitrix_id: str) -> list[dict[str, Any]]:
         bid = str(bitrix_id or "").strip()
@@ -741,7 +757,8 @@ class FlowEngine:
         seen: set[tuple[str, str]] = set()
         bases: list[dict[str, Any]] = []
         index_data = self._refresh_atwork_index()
-        entries = index_data.get("by_bitrix", {}).get(bid, [])
+        index_key = self._resolve_bitrix_index_key(index_data, bid)
+        entries = index_data.get("by_bitrix", {}).get(index_key, [])
         if not isinstance(entries, list):
             entries = []
         for raw in entries:
@@ -791,7 +808,7 @@ class FlowEngine:
         if not bases:
             self._clear_auth_state(state)
             if sync_result.get("error"):
-                logger.warning("Access denied for TelegramID=%s after S3 sync error: %s", tid, sync_result.get("error"))
+                logger.warning("Access denied for BitrixID=%s after S3 sync error: %s", tid, sync_result.get("error"))
             self._set_select_user_step(
                 state,
                 ACCESS_DENIED_CODE,
@@ -946,8 +963,19 @@ class FlowEngine:
         manifest["files"] = files_map
         manifest["user_files"] = self._rebuild_manifest_user_files(files_map)
 
+        user_files = manifest.get("user_files", {})
+        if not isinstance(user_files, dict):
+            user_files = {}
+        manifest_key = bid
+        if bid not in user_files:
+            bid_cf = bid.casefold()
+            for key in user_files:
+                if str(key or "").strip().casefold() == bid_cf:
+                    manifest_key = str(key).strip()
+                    break
+
         user_keys = [
-            key for key in manifest.get("user_files", {}).get(bid, [])
+            key for key in user_files.get(manifest_key, [])
             if isinstance(key, str) and key in s3_json_objects
         ]
         matched_local_names: set[str] = set()
@@ -1110,7 +1138,7 @@ class FlowEngine:
             "allowed_actions": ["select_user"],
             "ui_payload": {
                 "title": "Авторизация",
-                "instruction": "Введите ID",
+                "instruction": "Введите Bitrix ID (логин)",
             },
             "errors": [],
             "selected_base": None,
@@ -1137,7 +1165,7 @@ class FlowEngine:
             "session_dir": str(session_dir),
         }
 
-        # Start by Telegram/Bitrix ID: sync from S3 and verify access before base selection.
+        # Start by Bitrix ID: sync from S3 and verify access before base selection.
         if bid:
             if await self._authenticate_web_user(state, bid):
                 self._set_select_base_step(state, bid)

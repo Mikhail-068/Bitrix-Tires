@@ -53,7 +53,7 @@ In dev mode Vite proxies `/api` to:
 Do not put a full external URL into the UI field in dev mode unless the backend explicitly allows CORS from the Vite origin — use `/api`.
 
 ## Authentication
-- На старте пользователь вводит только **Telegram ID**.
+- На старте пользователь вводит только **Bitrix ID**.
 - Backend при каждом вводе ID точечно обновляет файлы этого пользователя из Yandex S3 в `AtWork/`.
 - После обновления backend ищет профиль по ID в `AtWork/`.
 - Если ID найден, backend возвращает выбор базы.
@@ -79,7 +79,7 @@ Do not put a full external URL into the UI field in dev mode unless the backend 
 ## Troubleshooting
 - Если поле «API URL» содержит полный внешний URL — замените на `/api` и перезапустите Vite после изменения конфига.
 - Цель прокси меняется переменной `VITE_BACKEND_URL` в `.env.local` (требует перезапуска dev-сервера).
-- Если пользователь есть в Yandex Bucket, но авторизация возвращает `access_denied`, проверьте backend-индекс `AtWork/.index_bitrix.json`, manifest `AtWork/.s3_manifest.json`, наличие `boto3` в окружении backend и S3-доступы; frontend отправляет только `{ TelegramID }`.
+- Если пользователь есть в Yandex Bucket, но авторизация возвращает `access_denied`, проверьте backend-индекс `AtWork/.index_bitrix.json`, manifest `AtWork/.s3_manifest.json`, наличие `boto3` в окружении backend и S3-доступы; frontend отправляет только `{ BitrixID }`.
 
 ## ⚠️ Если фото загружается, но шаг не меняется (снова «Перетащите фото»)
 
@@ -104,4 +104,3 @@ Do not put a full external URL into the UI field in dev mode unless the backend 
    ```
 
 3. **Перезапустите backend** после изменения `.env`.
-

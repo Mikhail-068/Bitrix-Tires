@@ -179,12 +179,12 @@ function App() {
     body: JSON.stringify(body),
   }), [apiFetch]);
 
-  const startFlow = useCallback(async ({ telegramId = "" } = {}) => {
+  const startFlow = useCallback(async ({ bitrixId = "" } = {}) => {
     setSessionId(null);
     setFlowState(null);
     await runBusy(async () => {
-      const trimmedId = String(telegramId || "").trim();
-      const body = trimmedId ? { TelegramID: trimmedId } : {};
+      const trimmedId = String(bitrixId || "").trim();
+      const body = trimmedId ? { BitrixID: trimmedId } : {};
       const nextState = await apiPost("/flow/start", body);
       setSessionId(nextState.session_id);
       setFlowState(nextState);
@@ -424,7 +424,7 @@ function ProgressPanel({ flowState }) {
 
 function WizardContent({ context }) {
   const { flowState } = context;
-  const [telegramId, setTelegramId] = useState("");
+  const [bitrixId, setBitrixId] = useState("");
 
   useEffect(() => {
     if (flowState?.step) {
@@ -433,29 +433,28 @@ function WizardContent({ context }) {
   }, [flowState?.step]);
 
   if (!flowState) {
-    const submitTelegramId = () => {
-      const idValue = telegramId.trim();
+    const submitBitrixId = () => {
+      const idValue = bitrixId.trim();
       if (!idValue) {
-        context.showToast("Введите Telegram ID", "error");
+        context.showToast("Введите Bitrix ID", "error");
         return;
       }
-      context.startFlow({ telegramId: idValue });
+      context.startFlow({ bitrixId: idValue });
     };
 
     return (
       <div className="step-body">
         <h2 className="step-title">Авторизация</h2>
-        <p className="step-hint">Введите Telegram ID. Backend обновит базу из Yandex S3 и проверит доступ.</p>
+        <p className="step-hint">Введите Bitrix ID (логин). Backend обновит базу из Yandex S3 и проверит доступ.</p>
         <input
           className="input-full"
-          value={telegramId}
-          onChange={(event) => setTelegramId(event.target.value.replace(/\D+/g, ""))}
-          onKeyDown={(event) => { if (event.key === "Enter") submitTelegramId(); }}
-          placeholder="Telegram ID"
-          inputMode="numeric"
-          autoComplete="off"
+          value={bitrixId}
+          onChange={(event) => setBitrixId(event.target.value.trimStart())}
+          onKeyDown={(event) => { if (event.key === "Enter") submitBitrixId(); }}
+          placeholder="Bitrix ID"
+          autoComplete="username"
         />
-        <button className="btn-primary btn-full mt-12" type="button" onClick={submitTelegramId}>▶ Начать сессию</button>
+        <button className="btn-primary btn-full mt-12" type="button" onClick={submitBitrixId}>▶ Начать сессию</button>
       </div>
     );
   }
@@ -507,26 +506,25 @@ function SelectBase({ payload, context }) {
 }
 
 function SelectUser({ payload, context }) {
-  const [telegramId, setTelegramId] = useState("");
+  const [bitrixId, setBitrixId] = useState("");
   const submit = () => {
-    if (!telegramId.trim()) {
-      context.showToast("Введите Telegram ID", "error");
+    if (!bitrixId.trim()) {
+      context.showToast("Введите Bitrix ID", "error");
       return;
     }
-    context.sendAction("select_user", { telegram_id: telegramId.trim() });
+    context.sendAction("select_user", { bitrix_id: bitrixId.trim() });
   };
   return (
     <div className="step-body">
       <h2 className="step-title">{payload.title || "Авторизация"}</h2>
-      <p className="step-hint">{payload.instruction || "Введите Telegram ID"}</p>
+      <p className="step-hint">{payload.instruction || "Введите Bitrix ID (логин)"}</p>
       <input
         className="input-full"
-        value={telegramId}
-        onChange={(event) => setTelegramId(event.target.value.replace(/\D+/g, ""))}
+        value={bitrixId}
+        onChange={(event) => setBitrixId(event.target.value.trimStart())}
         onKeyDown={(event) => { if (event.key === "Enter") submit(); }}
-        placeholder="Telegram ID"
-        inputMode="numeric"
-        autoComplete="off"
+        placeholder="Bitrix ID"
+        autoComplete="username"
       />
       <button className="btn-primary btn-full mt-12" type="button" onClick={submit}>Продолжить →</button>
     </div>

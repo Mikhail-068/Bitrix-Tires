@@ -56,10 +56,10 @@ VITE_BACKEND_URL=http://111.88.112.76:18080
 ## Авторизация web wizard
 
 Перед началом сессии пользователь вводит:
-- **Telegram ID**
+- **Bitrix ID**
 
 Backend:
-1. принимает `TelegramID` или совместимый алиас `BitrixID`;
+1. принимает `BitrixID` или совместимый алиас `TelegramID`;
 2. при каждом обращении обновляет `AtWork` из Yandex S3 для этого ID;
 3. ищет профиль и доступные базы по ID;
 4. при успехе ставит `auth_verified=true` и возвращает шаг `select_base`;
@@ -104,11 +104,11 @@ S3-синхронизация требует установленных `boto3` 
 ```json
 POST /api/flow/start
 {
-  "TelegramID": "1657181189"
+  "BitrixID": "t.ivanov"
 }
 ```
 
-Для Bitrix можно использовать `BitrixID` вместо `TelegramID`.
+`BitrixID` передается строкой. Старое поле `TelegramID` сохранено только как совместимый алиас.
 
 ### Backend на Backgosha
 
@@ -185,4 +185,3 @@ curl http://5.35.10.157:11437/health
 - [docs/Auth.md](docs/Auth.md) — S3 и авторизация
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура
 - [Agent.md](Agent.md) — правила интеграции
-

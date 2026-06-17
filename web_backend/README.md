@@ -63,24 +63,24 @@ TIRE_ANALYSIS_API_URL=http://localhost:11437/analyze
 
 ## Auth on start
 
-Standalone web wizard requires only Telegram/Bitrix ID. Surname is no longer required and is ignored if an old client still sends it.
+Standalone web wizard requires only Bitrix ID. Surname is no longer required and is ignored if an old client still sends it.
 
 ```json
 POST /api/flow/start
 {
-  "TelegramID": "1657181189"
+  "BitrixID": "t.ivanov"
 }
 ```
 
 Compatible aliases are accepted:
-- `TelegramID`
 - `BitrixID`
-- `telegram_id`
 - `bitrix_id`
+- `TelegramID`
+- `telegram_id`
 
 On start, backend:
 1. runs on-demand S3 sync for the submitted ID;
-2. searches `AtWork` by `TelegramID` / `BitrixID`;
+2. searches `AtWork` by `BitrixID` / `TelegramID`;
 3. returns `select_base` when at least one base is found;
 4. returns `select_user` with `access_denied` when the user is not found.
 
@@ -170,4 +170,3 @@ The server keeps runtime data outside the image:
 - `./runtime/log_upload` — 1C upload logs.
 
 Do not overwrite `.env` during deploy. It contains production ML URLs, S3 credentials, and 1C credentials. `docker-compose.yml` sets `PROJECT_ROOT=/app/web_backend` inside the container.
-
