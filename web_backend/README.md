@@ -63,18 +63,41 @@ TIRE_ANALYSIS_API_URL=http://localhost:11437/analyze
 
 ## Auth on start
 
-Standalone web wizard requires Telegram/Bitrix ID and surname:
+Standalone web wizard requires only Telegram/Bitrix ID. Surname is no longer required and is ignored if an old client still sends it.
 
 ```json
 POST /api/flow/start
 {
-  "TelegramID": "1657181189",
-  "surname": "Титов"
+  "TelegramID": "1657181189"
 }
 ```
 
-If ID or surname does not match AtWork data, backend returns step `select_user` with:
-`В доступе отказано, проверьте введенные данные`.
+Compatible aliases are accepted:
+- `TelegramID`
+- `BitrixID`
+- `telegram_id`
+- `bitrix_id`
+
+On start, backend:
+1. runs on-demand S3 sync for the submitted ID;
+2. searches `AtWork` by `TelegramID` / `BitrixID`;
+3. returns `select_base` when at least one base is found;
+4. returns `select_user` with `access_denied` when the user is not found.
+
+The on-demand sync is intentionally per-user and refreshes matched user files on every authorization attempt. The backend lists S3 metadata, maps JSON files to the submitted ID, downloads only those matched files into `AtWork/`, removes stale local files for the same ID, then rebuilds the local lookup index. This keeps changed bases and connection links current without downloading all users from the bucket.
+
+Public `access_denied` response contains a registration-help message and link:
+
+```json
+{
+  "code": "access_denied",
+  "message": "Пользователь с указанным Telegram ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации.",
+  "registration_help_url": "https://portal.rt24.ru/company/personal/user/4212/",
+  "registration_help_label": "Помощь в регистрации"
+}
+```
+
+S3/internal diagnostics are logged server-side and are not exposed to the user for this scenario.
 
 Auth data is read from `AtWork/*.json`. The backend maintains a local lookup index:
 - `AtWork/.index_bitrix.json` — generated lookup cache;
@@ -129,3 +152,21 @@ Runtime-created directories:
 Health checks:
 - `GET http://localhost:18080/health`
 - `GET http://localhost:18080/api/health`
+
+## Production on Backgosha
+
+Current server deployment runs only `web_backend`; frontend is not deployed there.
+
+```bash
+ssh Backgosha
+cd /home/ProTires/web_backend
+docker compose up -d --build
+docker compose ps
+```
+
+The server keeps runtime data outside the image:
+- `./runtime/AtWork` — S3-synced authorization files and lookup indexes;
+- `./runtime/Users` — web sessions and uploads;
+- `./runtime/log_upload` — 1C upload logs.
+
+Do not overwrite `.env` during deploy. It contains production ML URLs, S3 credentials, and 1C credentials. `docker-compose.yml` sets `PROJECT_ROOT=/app/web_backend` inside the container.

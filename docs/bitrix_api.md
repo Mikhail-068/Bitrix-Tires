@@ -1,7 +1,7 @@
 # ProTires API — Документация для Bitrix24
 
-**Версия:** 2.2  
-**Дата:** апрель 2026  
+**Версия:** 2.3  
+**Дата:** 17 июня 2026  
 
 ---
 
@@ -36,12 +36,12 @@
 const API = "http://111.88.112.76:18080/api";
 let SESSION_ID = null;
 
-// 1. Старт — передаём Bitrix ID и фамилию пользователя.
-async function startSession(bitrixId, surname) {
+// 1. Старт — передаём Bitrix ID пользователя.
+async function startSession(bitrixId) {
   const response = await fetch(`${API}/flow/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ BitrixID: bitrixId, surname })
+    body: JSON.stringify({ BitrixID: bitrixId })
   });
   const data = await response.json();
   SESSION_ID = data.session_id;  // сохраняем session_id
@@ -83,7 +83,7 @@ function renderStep(data) {
 
 **Пример вызова старта:**
 ```javascript
-await startSession("1657181189", "Титов");
+await startSession("1657181189");
 ```
 
 ---
@@ -92,6 +92,17 @@ await startSession("1657181189", "Титов");
 
 ```
 http://111.88.112.76:18080/api
+```
+
+Backend развернут на сервере `Backgosha` в Docker-контейнере `protires-backend`.
+Frontend на `Backgosha` не развернут: текущая рабочая схема — локальный Vite frontend, который проксирует `/api` на этот backend через `web_frontend/.env.local`.
+При старте сессии backend точечно обновляет данные введенного `TelegramID` / `BitrixID` из Yandex Bucket: скачивает только связанные с этим пользователем JSON-файлы в `AtWork/`, пересобирает индекс и уже после этого проверяет доступные базы. Это защищает от устаревших локальных данных при изменении базы или ссылки подключения.
+
+Проверка доступности backend:
+
+```text
+http://111.88.112.76:18080/health
+http://111.88.112.76:18080/api/health
 ```
 
 ---
@@ -208,27 +219,27 @@ Content-Type: application/json
 **Тело запроса (рекомендуемый формат для Bitrix):**
 ```json
 {
-  "BitrixID": "1657181189",
-  "surname": "Титов"
+  "BitrixID": "1657181189"
 }
 ```
 
 Поддерживаются варианты:
 
-1. `{"BitrixID": "...", "surname": "..."}` — основной формат для Bitrix/web.
-2. `{"TelegramID": "...", "surname": "..."}` — тот же ID, legacy-имя поля.
-3. `{"bitrix_id": "...", "surname": "..."}` / `{"telegram_id": "...", "surname": "..."}` — совместимые алиасы.
+1. `{"BitrixID": "..."}` — основной формат для Bitrix/web.
+2. `{"TelegramID": "..."}` — тот же ID, legacy-имя поля.
+3. `{"bitrix_id": "..."}` / `{"telegram_id": "..."}` — совместимые алиасы.
 4. `{"profile": {...}}` или список `[ {...} ]` — запуск от готового профиля.
+
+Если старый клиент продолжает отправлять `surname`, `last_name` или `family_name`, backend игнорирует эти поля.
 
 ### Что делает backend на старте
 
 На каждый `POST /flow/start` backend:
 - получает ID пользователя (`BitrixID` / `TelegramID`);
-- получает фамилию (`surname`);
 - обновляет из S3 только данные этого пользователя;
-- сверяет фамилию с ФИО из `AtWork`;
+- ищет профиль и доступные базы в `AtWork`;
 - при успехе возвращает шаг `select_base`;
-- при ошибке возвращает шаг `select_user` и сообщение `В доступе отказано, проверьте введенные данные`.
+- при ошибке возвращает шаг `select_user`, код `access_denied`, официальный текст и ссылку помощи в регистрации.
 
 Backend использует локальный индекс `AtWork/.index_bitrix.json` для поиска профилей по ID.
 Если пользователь есть в `AtWork/`, но API возвращает `select_user` с `access_denied`, проверьте индекс и S3-зависимости:
@@ -254,7 +265,6 @@ print(idx.get("by_bitrix", {}).get("5652315164"))
 | Поле | Откуда брать | Обязательно |
 |------|-------------|-------------|
 | `BitrixID` | `Bitrix ID` пользователя | Да |
-| `surname` | Фамилия пользователя из профиля Bitrix | Да |
 
 **Ответ** — первый шаг `select_base`:
 ```json
@@ -276,6 +286,30 @@ print(idx.get("by_bitrix", {}).get("5652315164"))
 ```
 
 > **Сохраните `session_id`** — он используется во всех следующих запросах.
+
+**Ответ, если пользователь не найден** — шаг `select_user` и ошибка `access_denied`:
+
+```json
+{
+  "session_id": "abc123def456",
+  "step": "select_user",
+  "allowed_actions": ["select_user"],
+  "ui_payload": {
+    "title": "Авторизация",
+    "instruction": "Введите Telegram ID"
+  },
+  "errors": [
+    {
+      "code": "access_denied",
+      "message": "Пользователь с указанным Telegram ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации.",
+      "registration_help_url": "https://portal.rt24.ru/company/personal/user/4212/",
+      "registration_help_label": "Помощь в регистрации"
+    }
+  ]
+}
+```
+
+Для этого сценария не показывайте технические S3/индекс-детали пользователю. Покажите текст ошибки, поле повторного ввода ID и кнопку `registration_help_label`, ведущую на `registration_help_url`.
 
 ---
 
@@ -377,7 +411,7 @@ if (sessionId) {
 
 | `step` | Что показать пользователю |
 |--------|--------------------------|
-| `select_user` | Форма авторизации: Telegram/Bitrix ID + фамилия |
+| `select_user` | Форма авторизации: Telegram/Bitrix ID |
 | `select_base` | Список доступных баз пользователя и выбор базы |
 | `select_source` | Кнопки «Склад» и «Транспорт» |
 | `upload_car_photo` | Зону загрузки фото авто + поле ввода номера вручную + пример фото |
@@ -399,7 +433,7 @@ if (sessionId) {
 
 | `action` | На каком `step` | `payload` | Описание |
 |----------|----------------|-----------|----------|
-| `select_user` | `select_user` | `{ "telegram_id": "...", "surname": "..." }` | Повторная авторизация по ID и фамилии |
+| `select_user` | `select_user` | `{ "telegram_id": "..." }` | Повторная авторизация по ID |
 | `select_base` | `select_base` | `{ "uid": "...", "base_name": "..." }` | Выбрать базу пользователя |
 | `select_source` | `select_source` | `{ "source": "Транспорт" }` или `{ "source": "Склад" }` | Пользователь выбрал источник |
 | `submit_manual_car_number` | `upload_car_photo` | `{ "car_number": "А123ВС77" }` | Пользователь ввёл номер вручную |
@@ -830,7 +864,7 @@ function renderStep(data) {
 
 | `code` | Что показать пользователю | Что делать |
 |--------|--------------------------|------------|
-| `access_denied` | «В доступе отказано, проверьте введенные данные» | Оставить экран `select_user`, дать ввести ID и фамилию заново |
+| `access_denied` | «Пользователь с указанным Telegram ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации.» | Оставить экран `select_user`, дать ввести ID заново и показать кнопку `Помощь в регистрации` на `registration_help_url` |
 | `invalid_base` | «База недоступна для этого пользователя» | Оставить экран `select_base`, дать выбрать базу заново |
 | `car_number_not_recognized` | «Номер не распознан. Переснимите фото или введите вручную» | Показать форму повторной загрузки и ввода |
 | `cropped` | «Шина обрезана по краям. Сделайте фото с отступом со всех сторон» | Показать форму повторной загрузки |
@@ -1028,6 +1062,3 @@ if (ui_payload.preview_file) {
   img.src = `${API}/flow/${SESSION_ID}/file/${ui_payload.preview_file}`;
 }
 ```
-
-
-

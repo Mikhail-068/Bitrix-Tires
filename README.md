@@ -43,24 +43,43 @@ npm run dev
 
 Открыть: `http://127.0.0.1:5173`
 
-По умолчанию Vite проксирует `/api` на `http://127.0.0.1:18080`.
-Для удалённого backend:
+Текущая рабочая схема: frontend запускается локально, а все запросы `/api` проксируются на backend на `Backgosha`.
+Это закреплено в `web_frontend/.env.local`:
 
-```powershell
-$env:VITE_BACKEND_URL = "http://111.88.112.76:18080"
-npm run dev
+```env
+VITE_BACKEND_URL=http://111.88.112.76:18080
 ```
+
+Если `.env.local` отсутствует, Vite использует fallback `http://127.0.0.1:18080`.
+После изменения `.env.local` dev-сервер нужно перезапустить.
 
 ## Авторизация web wizard
 
 Перед началом сессии пользователь вводит:
 - **Telegram ID**
-- **Фамилия**
 
 Backend:
-1. обновляет AtWork из Yandex S3 для этого ID;
-2. сверяет фамилию с ФИО из базы;
-3. при ошибке возвращает шаг `select_user` и сообщение: `В доступе отказано, проверьте введенные данные`.
+1. принимает `TelegramID` или совместимый алиас `BitrixID`;
+2. при каждом обращении обновляет `AtWork` из Yandex S3 для этого ID;
+3. ищет профиль и доступные базы по ID;
+4. при успехе ставит `auth_verified=true` и возвращает шаг `select_base`;
+5. при ошибке возвращает шаг `select_user` с официальным сообщением и ссылкой на помощь в регистрации.
+
+Обновление из S3 выполняется точечно: backend не скачивает весь bucket, а находит JSON-файлы, связанные с введенным ID, и заново загружает их в `AtWork`. Это защищает от устаревших данных, например если у пользователя изменилась база, ссылка подключения или сам файл был исправлен в Yandex Bucket.
+
+Сообщение для не найденного ID:
+
+```text
+Пользователь с указанным Telegram ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации.
+```
+
+Кнопка в UI:
+
+```text
+Помощь в регистрации → https://portal.rt24.ru/company/personal/user/4212/
+```
+
+Для `access_denied` frontend не показывает технические поля S3/индекса пользователю.
 
 Для быстрого поиска backend поддерживает локальный индекс `AtWork/.index_bitrix.json`.
 Индекс пересобирается автоматически при изменении JSON-файлов и не должен включать служебные файлы `.index_bitrix.json`, `.index_telegram.json`, `.s3_manifest.json`.
@@ -85,12 +104,35 @@ S3-синхронизация требует установленных `boto3` 
 ```json
 POST /api/flow/start
 {
-  "TelegramID": "1657181189",
-  "surname": "Титов"
+  "TelegramID": "1657181189"
 }
 ```
 
-Для Bitrix можно использовать `BitrixID` вместо `TelegramID` и передать фамилию из профиля пользователя.
+Для Bitrix можно использовать `BitrixID` вместо `TelegramID`.
+
+### Backend на Backgosha
+
+На сервере `Backgosha` backend работает в Docker:
+
+```bash
+cd /home/ProTires/web_backend
+docker compose up -d --build
+```
+
+Контейнер:
+- `protires-backend`
+- порт `18080`
+- runtime volumes:
+  - `./runtime/Users:/app/web_backend/Users`
+  - `./runtime/AtWork:/app/web_backend/AtWork`
+  - `./runtime/log_upload:/app/web_backend/log_upload`
+
+Проверка на сервере:
+
+```bash
+curl http://127.0.0.1:18080/health
+curl http://127.0.0.1:18080/api/health
+```
 
 ## ⚠️ Типичная проблема: ML-контейнеры недоступны
 

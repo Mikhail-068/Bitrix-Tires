@@ -103,19 +103,10 @@ async def analyze_tire(
 async def flow_start(body: Any = Body(default=None)) -> dict[str, Any]:
     profile: dict[str, Any] | None = None
     bitrix_id: str | None = None
-    surname: str | None = None
 
     # Preferred format: {"BitrixID": "..."} (or {"bitrix_id": "..."}).
     # Legacy compatibility: {"TelegramID": "..."} / {"telegram_id": "..."}.
     if isinstance(body, dict):
-        raw_surname = body.get("surname")
-        if raw_surname is None:
-            raw_surname = body.get("last_name")
-        if raw_surname is None:
-            raw_surname = body.get("family_name")
-        if raw_surname is not None:
-            surname = str(raw_surname).strip()
-
         raw_bitrix_id = body.get("BitrixID")
         if raw_bitrix_id is None:
             raw_bitrix_id = body.get("bitrix_id")
@@ -149,7 +140,7 @@ async def flow_start(body: Any = Body(default=None)) -> dict[str, Any]:
             if "BitrixID" not in profile and profile.get("TelegramID") not in (None, ""):
                 profile["BitrixID"] = profile.get("TelegramID")
 
-    return await flow_engine.start_flow(profile=profile, bitrix_id=bitrix_id, surname=surname)
+    return await flow_engine.start_flow(profile=profile, bitrix_id=bitrix_id)
 
 
 @router.get('/flow/{session_id}')

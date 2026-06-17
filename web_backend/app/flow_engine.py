@@ -66,6 +66,8 @@ STEP_FINISHED = "finished"
 
 ACCESS_DENIED_CODE = "access_denied"
 ACCESS_DENIED_MESSAGE = "В доступе отказано, проверьте введенные данные"
+REGISTRATION_HELP_URL = "https://portal.rt24.ru/company/personal/user/4212/"
+REGISTRATION_HELP_MESSAGE = "Пользователь с указанным Telegram ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации."
 
 
 def _now_iso() -> str:
@@ -718,16 +720,17 @@ class FlowEngine:
         state: dict[str, Any],
         code: str | None = None,
         message: str | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         if code and message:
-            self._set_error(state, code, message)
+            self._set_error(state, code, message, extra)
         self._set_step(
             state,
             STEP_SELECT_USER,
             allowed_actions=["select_user"],
             ui_payload={
                 "title": "Авторизация",
-                "instruction": "Введите Telegram ID и фамилию",
+                "instruction": "Введите Telegram ID",
             },
         )
 
@@ -760,21 +763,6 @@ class FlowEngine:
         bases.sort(key=lambda x: (x["base_name"].casefold(), x["uid"]))
         return bases
 
-    @staticmethod
-    def _normalize_surname(value: str) -> str:
-        return re.sub(r"[^A-Za-zА-Яа-яЁё-]+", "", str(value or "").strip()).replace("ё", "е").replace("Ё", "Е").casefold()
-
-    def _surname_matches_user_bases(self, bases: list[dict[str, Any]], surname: str) -> bool:
-        expected = self._normalize_surname(surname)
-        if not expected:
-            return False
-        for base in bases:
-            name = str(base.get("name", "") or "").strip()
-            first_token = name.split(maxsplit=1)[0] if name else ""
-            if self._normalize_surname(first_token) == expected:
-                return True
-        return False
-
     def _clear_auth_state(self, state: dict[str, Any]) -> None:
         state["bitrix_id"] = None
         state["telegram_id"] = None
@@ -784,35 +772,38 @@ class FlowEngine:
         state["selected_base"] = None
         state["selected_user"] = None
 
-    def _mark_auth_verified(self, state: dict[str, Any], telegram_id: str, surname: str) -> None:
+    def _mark_auth_verified(self, state: dict[str, Any], telegram_id: str) -> None:
         tid = str(telegram_id or "").strip()
         state["bitrix_id"] = tid
         state["telegram_id"] = tid
         state["auth_verified"] = True
-        state["verified_surname"] = self._normalize_surname(surname)
+        state["verified_surname"] = None
 
-    async def _authenticate_web_user(self, state: dict[str, Any], telegram_id: str, surname: str) -> bool:
+    async def _authenticate_web_user(self, state: dict[str, Any], telegram_id: str) -> bool:
         tid = str(telegram_id or "").strip()
-        surname_value = str(surname or "").strip()
-        if not tid or not surname_value:
+        if not tid:
             self._clear_auth_state(state)
             self._set_select_user_step(state, ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE)
             return False
 
-        sync_result = await self._sync_user_from_s3(tid, surname_value)
+        sync_result = await self._sync_user_from_s3(tid)
         bases = self._find_user_bases_by_bitrix_id(tid)
-        if not bases or not self._surname_matches_user_bases(bases, surname_value):
+        if not bases:
             self._clear_auth_state(state)
-            extra = {"bitrix_id": tid, "s3_sync": sync_result}
-            message = ACCESS_DENIED_MESSAGE
             if sync_result.get("error"):
-                message = f"{ACCESS_DENIED_MESSAGE}. S3: {sync_result['error']}"
-            elif not sync_result.get("downloaded") and not bases:
-                message = f"{ACCESS_DENIED_MESSAGE}. Профили для пользователя не загружены из S3"
-            self._set_select_user_step(state, ACCESS_DENIED_CODE, message, extra)
+                logger.warning("Access denied for TelegramID=%s after S3 sync error: %s", tid, sync_result.get("error"))
+            self._set_select_user_step(
+                state,
+                ACCESS_DENIED_CODE,
+                REGISTRATION_HELP_MESSAGE,
+                {
+                    "registration_help_url": REGISTRATION_HELP_URL,
+                    "registration_help_label": "Помощь в регистрации",
+                },
+            )
             return False
 
-        self._mark_auth_verified(state, tid, surname_value)
+        self._mark_auth_verified(state, tid)
         return True
 
     def _choose_profile_for_uid(self, uid: str, selected_base: str) -> dict[str, Any] | None:
@@ -863,7 +854,7 @@ class FlowEngine:
             return copy.deepcopy(row), file
         return None
 
-    def _sync_user_from_s3_blocking(self, bitrix_id: str, surname: str = "") -> dict[str, Any]:
+    def _sync_user_from_s3_blocking(self, bitrix_id: str) -> dict[str, Any]:
         downloaded: list[str] = []
         bid = str(bitrix_id or "").strip()
         if not bid:
@@ -882,8 +873,7 @@ class FlowEngine:
         prefix = (settings.s3_prefix or "").strip()
         if prefix and not prefix.endswith("/"):
             prefix += "/"
-        surname_prefix = str(surname or "").strip()
-        list_prefix = f"{prefix}{surname_prefix}" if surname_prefix else prefix
+        list_prefix = prefix
 
         session = boto3.session.Session()
         s3 = session.client(
@@ -915,13 +905,6 @@ class FlowEngine:
                     continue
                 s3_json_objects[key] = obj
                 s3_signatures[key] = self._s3_obj_signature(obj)
-
-        if surname_prefix and not s3_json_objects:
-            return {
-                "downloaded": downloaded,
-                "error": f"s3_no_json_for_prefix:{list_prefix}",
-                "matched_files": [],
-            }
 
         deleted_keys = {key for key in files_map.keys() if str(key).startswith(list_prefix)} - set(s3_signatures.keys())
         changed_or_new_keys: set[str] = set()
@@ -973,9 +956,6 @@ class FlowEngine:
             local_name = str(meta.get("local_name", "") or Path(key).name)
             local_path = self.paths.atwork_root / local_name
             matched_local_names.add(local_name)
-            need_download = (key in changed_or_new_keys) or (not local_path.exists())
-            if not need_download:
-                continue
             try:
                 s3.download_file(settings.s3_bucket_name, key, str(local_path))
                 downloaded.append(local_name)
@@ -1017,10 +997,10 @@ class FlowEngine:
             "list_prefix": list_prefix,
         }
 
-    async def _sync_user_from_s3(self, bitrix_id: str, surname: str = "") -> dict[str, Any]:
+    async def _sync_user_from_s3(self, bitrix_id: str) -> dict[str, Any]:
         try:
             return await asyncio.wait_for(
-                _run_in_thread(self._sync_user_from_s3_blocking, bitrix_id, surname),
+                _run_in_thread(self._sync_user_from_s3_blocking, bitrix_id),
                 timeout=45.0,
             )
         except asyncio.TimeoutError:
@@ -1109,10 +1089,8 @@ class FlowEngine:
         self,
         profile: dict[str, Any] | None = None,
         bitrix_id: str | None = None,
-        surname: str | None = None,
     ) -> dict[str, Any]:
         bid = str(bitrix_id or "").strip()
-        surname_value = str(surname or "").strip()
         if bid:
             self._cleanup_user_sessions_if_no_unsent(bid)
 
@@ -1132,7 +1110,7 @@ class FlowEngine:
             "allowed_actions": ["select_user"],
             "ui_payload": {
                 "title": "Авторизация",
-                "instruction": "Введите Telegram ID и фамилию",
+                "instruction": "Введите Telegram ID",
             },
             "errors": [],
             "selected_base": None,
@@ -1159,9 +1137,9 @@ class FlowEngine:
             "session_dir": str(session_dir),
         }
 
-        # Start by Telegram/Bitrix ID: sync from S3 and verify surname before base selection.
+        # Start by Telegram/Bitrix ID: sync from S3 and verify access before base selection.
         if bid:
-            if await self._authenticate_web_user(state, bid, surname_value):
+            if await self._authenticate_web_user(state, bid):
                 self._set_select_base_step(state, bid)
             self._save_state(state)
             return self._format_state(state)
@@ -1400,8 +1378,7 @@ class FlowEngine:
 
             elif action == "select_user":
                 user_id = str(payload.get("telegram_id", "") or payload.get("user_id", "") or "").strip()
-                surname = str(payload.get("surname", "") or payload.get("last_name", "") or "").strip()
-                if await self._authenticate_web_user(state, user_id, surname):
+                if await self._authenticate_web_user(state, user_id):
                     self._set_select_base_step(state, user_id)
 
             elif action == "navigate_back":
@@ -1468,7 +1445,7 @@ class FlowEngine:
                             allowed_actions=["select_user"],
                             ui_payload={
                                 "title": "Авторизация",
-                                "instruction": "Введите Telegram ID и фамилию",
+                                "instruction": "Введите Telegram ID",
                             },
                         )
                 elif step == STEP_SELECT_TRANSPORT_METHOD:

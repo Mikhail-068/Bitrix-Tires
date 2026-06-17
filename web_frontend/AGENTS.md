@@ -64,8 +64,8 @@ npm run build
 npm run preview -- --port 5173
 ```
 
-- В `vite.config.js` настроен прокси: `/api` → `process.env.VITE_BACKEND_URL || "http://127.0.0.1:18080"` (по умолчанию локальный backend).
-- Чтобы проксировать на удалённый backend, задайте `VITE_BACKEND_URL` перед запуском dev-сервера.
+- В `vite.config.js` настроен прокси: `/api` → `VITE_BACKEND_URL` из `.env.local`, fallback `http://127.0.0.1:18080`.
+- Текущая локальная схема использует `web_frontend/.env.local` с `VITE_BACKEND_URL=http://111.88.112.76:18080`, то есть frontend работает локально, а backend — на `Backgosha`.
 - В dev-режиме в поле «API URL» интерфейса следует указывать `/api`, а не полный внешний URL, иначе возможны CORS-проблемы.
 
 ---
@@ -83,7 +83,7 @@ npm run preview -- --port 5173
 
 Основные шаги (перечислены в `STEP_STAGES`):
 
-0. **Авторизация** (`select_user`) — ввод Telegram ID + фамилии (см. §5.5)
+0. **Авторизация** (`select_user`) — ввод Telegram ID (см. §5.5)
 1. **Настройка** (`select_base`, `select_source`)
 2. **Источник / авто** (`select_transport_method`, `upload_car_photo`, `enter_manual_car_number`, `confirm_car`)
 3. **Фото шин** (`set_tire_count`, `upload_tire_photo`, `confirm_photo`, `confirm_tire_number`, `post_required_photos`)
@@ -101,12 +101,12 @@ npm run preview -- --port 5173
 - Фото отправляются через `POST /api/flow/{session_id}/upload` (multipart/form-data, поле `image`).
 - Бэкенд возвращает `flowState` с результатом анализа (детекция, OCR серийных номеров, шипы и т.д.).
 
-### 5.5 Авторизация (Telegram ID + фамилия)
+### 5.5 Авторизация (Telegram ID)
 
-- Пользователь вводит **Telegram ID** и **фамилию** на стартовом экране (или на шаге `select_user`).
-- Запрос: `POST /api/flow/start` с телом `{ "TelegramID": "<id>", "surname": "<фамилия>" }` (поле `BitrixID` — legacy-алиас того же идентификатора).
-- Бэкенд синхронизирует данные пользователя из S3 (`AtWork/`) и проверяет, что фамилия соответствует найденному по ID профилю.
-- При несовпадении ID/фамилии возвращается шаг `select_user` с ошибкой `access_denied` («В доступе отказано, проверьте введенные данные»), и пользователь остаётся на форме ввода.
+- Пользователь вводит **Telegram ID** на стартовом экране (или на шаге `select_user`).
+- Запрос: `POST /api/flow/start` с телом `{ "TelegramID": "<id>" }` (поле `BitrixID` — legacy-алиас того же идентификатора).
+- Бэкенд синхронизирует данные пользователя из S3 (`AtWork/`) и проверяет, что по ID найден хотя бы один профиль/база.
+- Если ID не найден, возвращается шаг `select_user` с ошибкой `access_denied`; UI показывает официальный текст и кнопку «Помощь в регистрации» на `https://portal.rt24.ru/company/personal/user/4212/`.
 - Успешная проверка ставит флаг `auth_verified` в сессии; без него действие `select_base` отклоняется на бэкенде.
 
 ---
@@ -160,7 +160,7 @@ npm run preview -- --port 5173
 
 - **CORS**: в dev-режиме прокси Vite обходит CORS. В production фронтенд и бэкенд должны быть настроены на корректные CORS-заголовки.
 - **API URL**: не хардкодить полный внешний URL в UI-поле при работе через dev-сервер — использовать `/api` (цель прокси задаётся через `VITE_BACKEND_URL`).
-- **Авторизация**: доступ открывается только по совпадению Telegram ID и фамилии из `AtWork/` (S3). Хардкод тестового BitrixID убран.
+- **Авторизация**: доступ открывается только если Telegram ID найден в `AtWork/` (S3). Хардкод тестового BitrixID убран.
 - **Файлы**: при загрузке изображений проверяйте, что отправляется `FormData` с полем `image`.
 - **Session ID**: хранится в `localStorage`, поэтому сессия переживает перезагрузку страницы. Кнопка сброса («✕») полностью очищает сессию.
 

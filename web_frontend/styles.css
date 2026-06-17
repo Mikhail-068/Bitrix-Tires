@@ -342,6 +342,10 @@ body {
   padding: 10px 12px;
   margin-bottom: 8px;
 }
+.error-item-action {
+  display: grid;
+  gap: 10px;
+}
 .error-header {
   display: flex;
   flex-wrap: wrap;
@@ -350,6 +354,22 @@ body {
 }
 .error-code { font-weight: 700; color: var(--danger); font-size: 0.82rem; }
 .error-msg  { color: var(--text); font-size: 0.88rem; }
+.error-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  min-height: 38px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+.error-action-link:hover {
+  filter: brightness(1.05) saturate(1.05);
+  transform: translateY(-1px);
+}
 .error-detail summary {
   cursor: pointer;
   color: var(--muted);

@@ -179,13 +179,12 @@ function App() {
     body: JSON.stringify(body),
   }), [apiFetch]);
 
-  const startFlow = useCallback(async ({ telegramId = "", surname = "" } = {}) => {
+  const startFlow = useCallback(async ({ telegramId = "" } = {}) => {
     setSessionId(null);
     setFlowState(null);
     await runBusy(async () => {
       const trimmedId = String(telegramId || "").trim();
-      const trimmedSurname = String(surname || "").trim();
-      const body = trimmedId ? { TelegramID: trimmedId, surname: trimmedSurname } : {};
+      const body = trimmedId ? { TelegramID: trimmedId } : {};
       const nextState = await apiPost("/flow/start", body);
       setSessionId(nextState.session_id);
       setFlowState(nextState);
@@ -372,19 +371,29 @@ function ErrorBanner({ errors }) {
   if (!errors.length) return <div className="error-banner" />;
   return (
     <div className="error-banner">
-      {errors.map((error, index) => (
-        <div className="error-item" key={`${error.code || "error"}-${index}`}>
-          <div className="error-header">
-            <span className="error-msg">{error.message || ""}</span>
+      {errors.map((error, index) => {
+        const isAccessDenied = error.code === "access_denied";
+        const registrationUrl = isAccessDenied ? String(error.registration_help_url || "") : "";
+        const hasTechnicalDetails = !isAccessDenied && Object.keys(error).some((key) => !["code", "message"].includes(key));
+        return (
+          <div className={`error-item${isAccessDenied ? " error-item-action" : ""}`} key={`${error.code || "error"}-${index}`}>
+            <div className="error-header">
+              <span className="error-msg">{error.message || ""}</span>
+            </div>
+            {registrationUrl && (
+              <a className="btn-primary error-action-link" href={registrationUrl} target="_blank" rel="noreferrer">
+                {error.registration_help_label || "Помощь в регистрации"}
+              </a>
+            )}
+            {hasTechnicalDetails && (
+              <details className="error-detail">
+                <summary>Подробности</summary>
+                <pre>{JSON.stringify(error, null, 2)}</pre>
+              </details>
+            )}
           </div>
-          {Object.keys(error).some((key) => !["code", "message"].includes(key)) && (
-            <details className="error-detail">
-              <summary>Подробности</summary>
-              <pre>{JSON.stringify(error, null, 2)}</pre>
-            </details>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -416,7 +425,6 @@ function ProgressPanel({ flowState }) {
 function WizardContent({ context }) {
   const { flowState } = context;
   const [telegramId, setTelegramId] = useState("");
-  const [surname, setSurname] = useState("");
 
   useEffect(() => {
     if (flowState?.step) {
@@ -427,18 +435,17 @@ function WizardContent({ context }) {
   if (!flowState) {
     const submitTelegramId = () => {
       const idValue = telegramId.trim();
-      const surnameValue = surname.trim();
-      if (!idValue || !surnameValue) {
-        context.showToast("Введите Telegram ID и фамилию", "error");
+      if (!idValue) {
+        context.showToast("Введите Telegram ID", "error");
         return;
       }
-      context.startFlow({ telegramId: idValue, surname: surnameValue });
+      context.startFlow({ telegramId: idValue });
     };
 
     return (
       <div className="step-body">
         <h2 className="step-title">Авторизация</h2>
-        <p className="step-hint">Введите Telegram ID и фамилию. Backend обновит базу из Yandex S3 и проверит доступ.</p>
+        <p className="step-hint">Введите Telegram ID. Backend обновит базу из Yandex S3 и проверит доступ.</p>
         <input
           className="input-full"
           value={telegramId}
@@ -447,14 +454,6 @@ function WizardContent({ context }) {
           placeholder="Telegram ID"
           inputMode="numeric"
           autoComplete="off"
-        />
-        <input
-          className="input-full"
-          value={surname}
-          onChange={(event) => setSurname(event.target.value)}
-          onKeyDown={(event) => { if (event.key === "Enter") submitTelegramId(); }}
-          placeholder="Фамилия"
-          autoComplete="family-name"
         />
         <button className="btn-primary btn-full mt-12" type="button" onClick={submitTelegramId}>▶ Начать сессию</button>
       </div>
@@ -509,18 +508,17 @@ function SelectBase({ payload, context }) {
 
 function SelectUser({ payload, context }) {
   const [telegramId, setTelegramId] = useState("");
-  const [surname, setSurname] = useState("");
   const submit = () => {
-    if (!telegramId.trim() || !surname.trim()) {
-      context.showToast("Введите Telegram ID и фамилию", "error");
+    if (!telegramId.trim()) {
+      context.showToast("Введите Telegram ID", "error");
       return;
     }
-    context.sendAction("select_user", { telegram_id: telegramId.trim(), surname: surname.trim() });
+    context.sendAction("select_user", { telegram_id: telegramId.trim() });
   };
   return (
     <div className="step-body">
       <h2 className="step-title">{payload.title || "Авторизация"}</h2>
-      <p className="step-hint">{payload.instruction || "Введите Telegram ID и фамилию"}</p>
+      <p className="step-hint">{payload.instruction || "Введите Telegram ID"}</p>
       <input
         className="input-full"
         value={telegramId}
@@ -529,14 +527,6 @@ function SelectUser({ payload, context }) {
         placeholder="Telegram ID"
         inputMode="numeric"
         autoComplete="off"
-      />
-      <input
-        className="input-full"
-        value={surname}
-        onChange={(event) => setSurname(event.target.value)}
-        onKeyDown={(event) => { if (event.key === "Enter") submit(); }}
-        placeholder="Фамилия"
-        autoComplete="family-name"
       />
       <button className="btn-primary btn-full mt-12" type="button" onClick={submit}>Продолжить →</button>
     </div>
