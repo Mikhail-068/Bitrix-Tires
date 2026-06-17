@@ -5,7 +5,7 @@
   "source_file": "B:\\Tires_Bitrix\\Users\\D_133705_16062026_Стеблев_Сергей_Вячеславович\\D_133705_16062026_Стеблев_Сергей_Вячеславович.json",
   "status": "error",
   "details": {},
-  "request_url": "https://1c.rg24.ru/ATPLite/hs/Exchange_AI/CarsData",
+  "request_url": "https://1c.rg24.ru/ATPLite/hs/Exchange_AI/TireDefect",
   "connection_string": "http://ws-pub1c:800/RT83_ATP_KLG_TESTII",
   "response_status": 200,
   "response_text": "{\n\"Error\": \"Сотруднику не доступен сервис получения данных авто\"\n}",
