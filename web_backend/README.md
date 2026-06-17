@@ -91,7 +91,7 @@ Public `access_denied` response contains a registration-help message and link:
 ```json
 {
   "code": "access_denied",
-  "message": "Пользователь с указанным Telegram ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации.",
+  "message": "Пользователь с указанным ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации.",
   "registration_help_url": "https://portal.rt24.ru/company/personal/user/4212/",
   "registration_help_label": "Помощь в регистрации"
 }
@@ -170,3 +170,4 @@ The server keeps runtime data outside the image:
 - `./runtime/log_upload` — 1C upload logs.
 
 Do not overwrite `.env` during deploy. It contains production ML URLs, S3 credentials, and 1C credentials. `docker-compose.yml` sets `PROJECT_ROOT=/app/web_backend` inside the container.
+

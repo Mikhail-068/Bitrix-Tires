@@ -67,7 +67,7 @@ STEP_FINISHED = "finished"
 ACCESS_DENIED_CODE = "access_denied"
 ACCESS_DENIED_MESSAGE = "В доступе отказано, проверьте введенные данные"
 REGISTRATION_HELP_URL = "https://portal.rt24.ru/company/personal/user/4212/"
-REGISTRATION_HELP_MESSAGE = "Пользователь с указанным Telegram ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации."
+REGISTRATION_HELP_MESSAGE = "Пользователь с указанным ID не найден. Проверьте корректность введенных данных. Если ID указан верно, обратитесь к ответственному сотруднику для помощи в регистрации."
 
 
 def _now_iso() -> str:
@@ -730,7 +730,7 @@ class FlowEngine:
             allowed_actions=["select_user"],
             ui_payload={
                 "title": "Авторизация",
-                "instruction": "Введите Telegram ID",
+                "instruction": "Введите ID",
             },
         )
 
@@ -1110,7 +1110,7 @@ class FlowEngine:
             "allowed_actions": ["select_user"],
             "ui_payload": {
                 "title": "Авторизация",
-                "instruction": "Введите Telegram ID",
+                "instruction": "Введите ID",
             },
             "errors": [],
             "selected_base": None,
@@ -1377,7 +1377,14 @@ class FlowEngine:
                     )
 
             elif action == "select_user":
-                user_id = str(payload.get("telegram_id", "") or payload.get("user_id", "") or "").strip()
+                user_id = str(
+                    payload.get("BitrixID", "")
+                    or payload.get("bitrix_id", "")
+                    or payload.get("TelegramID", "")
+                    or payload.get("telegram_id", "")
+                    or payload.get("user_id", "")
+                    or ""
+                ).strip()
                 if await self._authenticate_web_user(state, user_id):
                     self._set_select_base_step(state, user_id)
 
@@ -1445,7 +1452,7 @@ class FlowEngine:
                             allowed_actions=["select_user"],
                             ui_payload={
                                 "title": "Авторизация",
-                                "instruction": "Введите Telegram ID",
+                                "instruction": "Введите ID",
                             },
                         )
                 elif step == STEP_SELECT_TRANSPORT_METHOD:
