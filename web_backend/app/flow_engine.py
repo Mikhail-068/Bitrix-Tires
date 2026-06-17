@@ -93,8 +93,7 @@ def _normalize_exchange_ai_url(base_url: str) -> str:
     if "://" not in base:
         base = f"http://{base}"
     base = base.rstrip("/")
-    if re.search(r"/hs/Exchange_AI/[^/]+$", base, flags=re.IGNORECASE):
-        return base
+    base = re.sub(r"/hs/Exchange_AI(?:/[^/]+)?$", "/hs/Exchange_AI", base, flags=re.IGNORECASE)
     return f"{base}/TireDefect"
 
 
