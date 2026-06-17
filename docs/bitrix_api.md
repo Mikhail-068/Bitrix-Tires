@@ -83,7 +83,7 @@ function renderStep(data) {
 
 **Пример вызова старта:**
 ```javascript
-await startSession("1657181189");
+await startSession("t.ivanov");
 ```
 
 ---
@@ -143,7 +143,7 @@ Bitrix не содержит никакой логики — только пок
   "step": "select_base",
   "allowed_actions": ["select_base"],
   "ui_payload": {
-    "bitrix_id": "1657181189",
+    "bitrix_id": "t.ivanov",
     "user_name": "Титов Михаил Сергеевич",
     "bases": [
       { "uid": "0af2c315-4d7b-11e6-80c6-0017a477000a", "base_name": "АТП ЧЕЛЯБИНСК" }
@@ -219,7 +219,7 @@ Content-Type: application/json
 **Тело запроса (рекомендуемый формат для Bitrix):**
 ```json
 {
-  "BitrixID": "1657181189"
+  "BitrixID": "t.ivanov"
 }
 ```
 
@@ -250,6 +250,8 @@ Content-Type: application/json
 |------|-------------|-------------|
 | `BitrixID` | `Bitrix ID` пользователя | Да |
 
+`BitrixID` передавайте как строку. Это может быть как числовой ID, так и строковый идентификатор/логин пользователя, например `"t.ivanov"` — backend обрабатывает значение как строку.
+
 **Ответ** — первый шаг `select_base`:
 ```json
 {
@@ -257,7 +259,7 @@ Content-Type: application/json
   "step": "select_base",
   "allowed_actions": ["select_base"],
   "ui_payload": {
-    "bitrix_id": "1657181189",
+    "bitrix_id": "t.ivanov",
     "user_name": "Титов Михаил Сергеевич",
     "bases": [
       { "uid": "0af2c315-4d7b-11e6-80c6-0017a477000a", "base_name": "АТП ЧЕЛЯБИНСК" }
@@ -490,7 +492,7 @@ case "select_source":
 
 ```json
 "ui_payload": {
-  "bitrix_id": "1657181189",
+  "bitrix_id": "t.ivanov",
   "user_name": "Титов Михаил Сергеевич",
   "bases": [
     { "uid": "0af2c315-4d7b-11e6-80c6-0017a477000a", "base_name": "АТП ЧЕЛЯБИНСК" }
@@ -1071,3 +1073,4 @@ if (ui_payload.preview_file) {
 ### Фото загружено, но шаг не изменился
 
 Ориентируйтесь на `errors` в ответе backend. Чаще всего это означает, что фото не распознано, изображение невалидно или временно недоступен один из ML-сервисов. В любом случае повторно рендерите экран по текущему `step` из ответа.
+
