@@ -8,6 +8,12 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      allowedHosts: [
+        "списать-шины.рф",
+        "www.списать-шины.рф",
+        "xn----7sbxczhnck5d9ah.xn--p1ai",
+        "www.xn----7sbxczhnck5d9ah.xn--p1ai",
+      ],
       proxy: {
         "/api": {
           target: backendUrl,
