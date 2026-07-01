@@ -221,16 +221,16 @@ function App() {
       return;
     }
     await runBusy(async () => {
+      const uploadFile = await resizeImageToFHD(file);
       const form = new FormData();
-      form.append("image", file);
+      form.append("image", uploadFile);
       setFlowState(await apiFetch(`/flow/${id}/upload`, { method: "POST", body: form }));
     });
   }, [apiFetch, runBusy, showToast]);
 
   useEffect(() => {
-    setSessionId(null);
-    setFlowState(null);
-  }, []);
+    loadFlow();
+  }, [loadFlow]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -1059,8 +1059,7 @@ function spikeBoxesFromResult(result, imageSize) {
     let x2 = isXYWH ? b1 + b3 : b3;
     let y2 = isXYWH ? b2 + b4 : b4;
 
-    const appearsSquarePadded = imageW > 0 && imageH > 0 && maxSide > 0
-      && (x2 > imageW || y2 > imageH || x1 > imageW || y1 > imageH);
+    const appearsSquarePadded = imageW > 0 && imageH > 0 && maxSide > 0 && imageW !== imageH;
     if (appearsSquarePadded) {
       x1 -= offsetLeft;
       x2 -= offsetLeft;
@@ -1259,13 +1258,20 @@ function UploadZone({ onFile }) {
     if (preview) URL.revokeObjectURL(preview);
   }, [preview]);
 
-  const setFile = (file) => {
+  const setFile = async (file) => {
     if (!file) return;
     setSelectedFile(file);
     setPreview((current) => {
       if (current) URL.revokeObjectURL(current);
       return URL.createObjectURL(file);
     });
+    setUploading(true);
+    try {
+      await onFile(file);
+      clearSelection();
+    } finally {
+      setUploading(false);
+    }
   };
 
   const clearSelection = () => {
@@ -1279,7 +1285,7 @@ function UploadZone({ onFile }) {
   return (
     <div className="upload-wrapper">
       <label className={`upload-zone${selectedFile ? " has-file" : ""}${dragOver ? " drag-over" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(event) => { event.preventDefault(); setDragOver(false); setFile(event.dataTransfer.files?.[0]); }}>
-        <input className="upload-input" type="file" accept="image/*" capture="environment" onChange={(event) => setFile(event.target.files?.[0])} />
+        <input className="upload-input" type="file" accept="image/*" capture="environment" disabled={uploading} onChange={(event) => setFile(event.target.files?.[0])} />
         {preview ? (
           <div className="upload-preview-wrap">
             <img className="upload-preview" src={preview} alt="preview" />
@@ -1287,6 +1293,7 @@ function UploadZone({ onFile }) {
               className="upload-preview-clear"
               type="button"
               aria-label="Удалить выбранное фото"
+              disabled={uploading}
               onClick={(event) => { event.preventDefault(); event.stopPropagation(); clearSelection(); }}
             >
               ×
@@ -1313,16 +1320,6 @@ function UploadZone({ onFile }) {
           </div>
         </div>
       )}
-      <button className="btn-primary btn-full" type="button" disabled={!selectedFile || uploading} onClick={async () => {
-        if (!selectedFile) return;
-        setUploading(true);
-        try {
-          await onFile(selectedFile);
-          clearSelection();
-        } finally {
-          setUploading(false);
-        }
-      }}>{uploading ? "Загружаем..." : "Загрузить →"}</button>
     </div>
   );
 }
